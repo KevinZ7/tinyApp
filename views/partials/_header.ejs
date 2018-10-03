@@ -1,1 +1,13 @@
 <h1> Tiny APP </h1>
+<% if(username){ %>
+  <%= username %> <form method="POST" action="/logout">
+    <input type="submit" value="logout">
+  </form>
+<%} else{ %>
+  <form method="POST" action="/login">
+    <input type="text" name="username" placeholder="username">
+    <input type="submit" value="login">
+  </form>
+<%}%>
+
+
