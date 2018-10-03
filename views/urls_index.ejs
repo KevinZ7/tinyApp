@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>TinyApp</title>
+</head>
+<body>
+  <header>
+     <% include partials/_header.ejs %>
+  </header>
+
+    <% for(var value in urls){ %>
+
+
+      <div>
+        <%= value %> - <a href=<%=urls[value]%>> <%= urls[value]%></a>
+        <a href="/urls/<%=value%>">Edit</a>
+        <form style="display: inline;" method="POST" action="/urls/<%= value %>/delete">
+          <input type="submit" value="delete">
+        </form>
+      </div>
+
+    <% } %>
+
+</body>
+</html>
+
