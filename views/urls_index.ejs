@@ -8,18 +8,23 @@
      <% include partials/_header.ejs %>
   </header>
 
+  <% if(user){ %>
     <% for(var value in urls){ %>
 
-
       <div>
-        <%= value %> - <a href=<%=urls[value]%>> <%= urls[value]%></a>
+        <%= urls[value].shortURL %> - <a href=<%=urls[value].longURL%>> <%= urls[value].longURL%></a>
         <a href="/urls/<%=value%>">Edit</a>
         <form style="display: inline;" method="POST" action="/urls/<%= value %>/delete">
           <input type="submit" value="delete">
         </form>
       </div>
-
     <% } %>
+    <a href="/urls/new">Add a new link</a>
+  <%} else{%>
+    <h1>Please Log in or Register First!</h1>
+  <%}%>
+
+
 
 </body>
 </html>

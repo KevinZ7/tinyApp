@@ -1,29 +1,45 @@
 var express = require("express");
 var app = express();
-var cookieParser = require("cookie-parser");
+// var cookieParser = require("cookie-parser");
 var PORT = 8080; // default port 8080
-
+const bcrypt = require('bcrypt');
 const bodyParser = require("body-parser");
+var cookieSession = require('cookie-session')
+
+app.use(cookieSession({
+  name: 'session',
+  keys: ['a cat jumped the fence'],
+  // Cookie Options
+ // maxAge: 5 * 1000 // 24 hours
+}));
 app.use(bodyParser.urlencoded({extended: true}));
-app.use(cookieParser());
+// app.use(cookieParser());
 
 app.set("view engine", "ejs");
 
 var urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  "b2xVn2": {
+    shortURL: "b2xVn2",
+    longURL: "http://www.lighthouselabs.ca",
+    userID: "userRandomID"
+  },
+  "9sm5xK": {
+    shortURL: "9sm5xK",
+    longURL: "http://www.google.com",
+    userID: "user2RandomID"
+  }
 };
 
 const users = {
   "userRandomID": {
     id: "userRandomID",
-    email: "user@example.com",
-    password: "purple-monkey-dinosaur"
+    email: "test1@g.com",
+    password: bcrypt.hashSync("test1", 10)
   },
  "user2RandomID": {
     id: "user2RandomID",
-    email: "user2@example.com",
-    password: "dishwasher-funk"
+    email: "test2@g.com",
+    password: bcrypt.hashSync("test2", 10)
   }
 }
 
@@ -38,6 +54,20 @@ function generateRandomString(){
   }
 
   return result;
+}
+
+function urlsForUser(id){
+  var urlsForUser = {};
+  for(var url in urlDatabase ){
+    if(urlDatabase[url].userID === id){
+      urlsForUser[urlDatabase[url].shortURL] = {
+        shortURL: urlDatabase[url].shortURL,
+        longURL: urlDatabase[url].longURL
+      }
+    }
+  }
+
+  return urlsForUser;
 }
 
 
@@ -55,22 +85,27 @@ app.get("/hello", (req, res) => {
 
 app.get("/urls", (req, res) => {
   let templateVars = {
-    urls: urlDatabase,
-    user: users[req.cookies["user_id"]]
+    urls: urlsForUser(req.session.user_id),
+    user: users[req.session.user_id]
   };
+
   res.render("urls_index", templateVars);
 });
 
 app.get("/urls/new", (req, res) => {
   let templateVars = {
-    // username: req.cookies["username"]
-    user: users[req.cookies["user_id"]]
+    user: users[req.session.user_id]
   }
-  res.render("urls_new", templateVars);
+
+  if(req.session.user_id){
+    res.render("urls_new", templateVars);
+  }else {
+    res.redirect('/login');
+  }
 })
 
 app.get("/u/:shortURL", (req, res) => {
-  let longURL = urlDatabase[req.params.shortURL];
+  let longURL = urlDatabase[req.params.shortURL].longURL;
   res.redirect(longURL);
 })
 
@@ -79,9 +114,20 @@ app.get("/urls/:id", (req, res) => {
     shortURL: req.params.id,
     longURL: urlDatabase[req.params.id],
     // username: req.cookies["username"]
-    user: users[req.cookies["user_id"]]
+    user: users[req.session.user_id]
   };
-  res.render("urls_show", templateVars);
+
+
+  let userURL = urlsForUser(req.session.user_id);
+
+  if(!req.session.user_id){
+    res.send("You are not logged in, please log in first!");
+  }else if(!userURL[req.params.id]){
+    res.send("That link does not beong to you, please try again!")
+  } else{
+    res.render("urls_show", templateVars);
+  }
+
 });
 
 app.get("/register", (req, res) => {
@@ -94,7 +140,11 @@ app.get("/login", (req, res) => {
 
 app.post("/urls", (req, res) => {
   var shortURL = generateRandomString();
-  urlDatabase[shortURL] = req.body.longURL;
+  urlDatabase[shortURL] = {
+    shortURL: shortURL,
+    longURL: req.body.longURL,
+    userID: req.session.user_id
+  }
   res.redirect('/urls/' + shortURL);
 
 });
@@ -131,12 +181,13 @@ app.post("/register", (req, res) => {
   }
 
   if(error === false){
-     users[userID] = {
+    let hashedPass = bcrypt.hashSync(password, 10);
+    users[userID] = {
       id: userID,
       email: req.body.email,
-      password: req.body.password
+      password: hashedPass
     };
-    res.cookie("user_id",userID);
+    req.session.user_id = userID;
     res.redirect("/urls");
   }
 });
@@ -147,11 +198,14 @@ app.post("/login", (req, res) => {
   var email = req.body.email;
   var password = req.body.password;
 
+
   for(var user in users){
     if(users[user].email === email){
       emailFound = true;
-      if(users[user].password === password){
+      if(bcrypt.compareSync(password, users[user].password)){
         correctCred = true;
+        req.session.user_id = users[user].id;
+        res.redirect('/urls');
       }
     }
   }
@@ -164,17 +218,12 @@ app.post("/login", (req, res) => {
     res.status(403);
     res.send("Wrong password, please go back and try again!");
   }
-  else if(correctCred === true){
-     res.cookie("user_id",users[user].id);
-     res.redirect('/');
-  }
 
-  console.log(users);
 
 });
 
 app.post("/logout", (req, res) => {
-  res.clearCookie('user_id');
+  req.session = null;
   res.redirect("/urls");
 });
 
