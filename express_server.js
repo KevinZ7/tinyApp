@@ -1,7 +1,7 @@
+//app setup section:
 var express = require("express");
 var app = express();
-// var cookieParser = require("cookie-parser");
-var PORT = 8080; // default port 8080
+var PORT = 8080;
 const bcrypt = require('bcrypt');
 const bodyParser = require("body-parser");
 var cookieSession = require('cookie-session')
@@ -9,12 +9,8 @@ var cookieSession = require('cookie-session')
 app.use(cookieSession({
   name: 'session',
   keys: ['a cat jumped the fence'],
-  // Cookie Options
- // maxAge: 5 * 1000 // 24 hours
 }));
 app.use(bodyParser.urlencoded({extended: true}));
-// app.use(cookieParser());
-
 app.set("view engine", "ejs");
 
 var urlDatabase = {
@@ -43,8 +39,9 @@ const users = {
   }
 }
 
+//Function used to generate a random ID for URLs and Users
 function generateRandomString(){
-  var alphanumeric = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  var alphanumeric = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   var alphanumericArray = alphanumeric.split('');
   var result = '';
 
@@ -70,9 +67,13 @@ function urlsForUser(id){
   return urlsForUser;
 }
 
-
+//all get requests
 app.get("/", (req, res) => {
-  res.send("Hello!");
+  if(req.session.user_id){
+    res.redirect('/urls');
+  } else{
+    res.redirect('/login');
+  }
 });
 
 app.get("/urls.json", (req, res) => {
@@ -105,18 +106,28 @@ app.get("/urls/new", (req, res) => {
 })
 
 app.get("/u/:shortURL", (req, res) => {
-  let longURL = urlDatabase[req.params.shortURL].longURL;
-  res.redirect(longURL);
+  var urlFound = false;
+
+  for(let url in urlDatabase){
+
+    console.log(`shortURL of current loop: ${urlDatabase[url].shortURL}`);
+    console.log(`shortURL of user: ${req.params.shortURL}`);
+    if(urlDatabase[url].shortURL === req.params.shortURL){
+      urlFound = true;
+    }
+    console.log(`was the url Found: ${urlFound}`);
+  }
+
+  if(urlFound === true){
+    let longURL = urlDatabase[req.params.shortURL].longURL;
+    res.redirect(longURL);
+  }
+  else{
+    res.send("Sorry, that shortURL does not seem to exist, please try again!");
+  }
 })
 
 app.get("/urls/:id", (req, res) => {
-  let templateVars = {
-    shortURL: req.params.id,
-    longURL: urlDatabase[req.params.id],
-    // username: req.cookies["username"]
-    user: users[req.session.user_id]
-  };
-
 
   let userURL = urlsForUser(req.session.user_id);
 
@@ -125,19 +136,34 @@ app.get("/urls/:id", (req, res) => {
   }else if(!userURL[req.params.id]){
     res.send("That link does not beong to you, please try again!")
   } else{
+    let templateVars = {
+      shortURL: req.params.id,
+      longURL: urlDatabase[req.params.id].longURL,
+      user: users[req.session.user_id]
+    };
     res.render("urls_show", templateVars);
   }
 
 });
 
 app.get("/register", (req, res) => {
-  res.render("register");
+    if(req.session.user_id){
+    res.redirect('/urls');
+  } else{
+    res.render("register");
+  }
 });
 
 app.get("/login", (req, res) => {
-  res.render("login");
+  if(req.session.user_id){
+    res.redirect('/urls');
+  } else{
+    res.render("login");
+  }
 })
 
+
+//all post requests
 app.post("/urls", (req, res) => {
   var shortURL = generateRandomString();
   urlDatabase[shortURL] = {
@@ -156,7 +182,12 @@ app.post("/urls/:id/delete", (req, res) => {
 });
 
 app.post("/urls/:id", (req, res) => {
-  urlDatabase[req.params.id] = req.body.newURL;
+  const shortURL = req.params.id;
+  urlDatabase[shortURL] = {
+    shortURL: shortURL,
+    longURL: req.body.newURL,
+    userID: req.session.user_id
+  };
   res.redirect('/urls');
 });
 
